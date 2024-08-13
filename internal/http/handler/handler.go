@@ -48,8 +48,14 @@ func (h *Handler) ShortURLHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the URL is valid
+	if req.URL == "" {
+		http.Error(w, "URL is required", http.StatusBadRequest)
+		return
+	}
+
 	// Shorten the URL
-	shortURL, err := h.service.ShortenURL(r.Context(), string(body))
+	shortURL, err := h.service.ShortenURL(r.Context(), req.URL)
 	if err != nil {
 		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
 		return
