@@ -16,6 +16,7 @@ type Config struct {
 	BaseURL       string
 	DatabaseDSN   string
 	Restore       bool
+	SyncWrite     bool
 }
 
 // New parses command line flags and environment variables and returns a new Config. If no en
@@ -26,6 +27,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.DatabaseDSN, "d", defaultDatabaseDSN, "database DSN")
 	flag.StringVar(&cfg.ServerAddress, "a", defaultServerAddress, "server address")
 	flag.StringVar(&cfg.BaseURL, "b", defaultBaseURL, "base URL")
+	flag.BoolVar(&cfg.SyncWrite, "s", false, "sync write")
 	flag.Parse()
 
 	if os.Getenv("SERVER_ADDRESS") != "" {
@@ -39,6 +41,9 @@ func New() (*Config, error) {
 	}
 	if os.Getenv("RESTORE") != "" {
 		cfg.Restore = os.Getenv("RESTORE") == "true"
+	}
+	if os.Getenv("SYNC_WRITE") != "" {
+		cfg.SyncWrite = os.Getenv("SYNC_WRITE") == "true"
 	}
 	return &cfg, nil
 }

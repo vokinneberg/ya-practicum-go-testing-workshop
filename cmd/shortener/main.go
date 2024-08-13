@@ -36,8 +36,14 @@ func main() {
 	}
 	defer dbpool.Close()
 
+	// Check if the database is accessible
+	if err := dbpool.Ping(ctx); err != nil {
+		logger.Error("Unable to access database", "error", err)
+		panic(err)
+	}
+
 	// Initialize the repository
-	repository := url.NewRepository(dbpool, false)
+	repository := url.NewRepository(dbpool, cfg.SyncWrite)
 	if cfg.Restore {
 		if err := repository.Restore(ctx); err != nil {
 			logger.Error("Error restoring repository", "error", err)
