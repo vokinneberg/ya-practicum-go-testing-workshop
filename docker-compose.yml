@@ -3,13 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    tty: true
     restart: always
     environment:
       - SERVER_ADDRESS=localhost:8080
       - BASE_URL=http://localhost:8080
       - RESTORE=true
       - DATABASE_DSN=postgres://postgres:postgres@ya-praktukum-go-testing-workshop-postgres-1:5432/postgres?sslmode=disable
-      - SYNC_WRITE=true
+      - SYNC_WRITE=false
     ports:
       - "8080:8080"
     depends_on:

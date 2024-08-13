@@ -51,6 +51,7 @@ func main() {
 		}
 	}
 	defer func() {
+		logger.Info("Flushing repository before shutdown")
 		if err := repository.Flush(ctx); err != nil {
 			logger.Error("Error flushing repository", "error", err)
 		}
@@ -82,7 +83,7 @@ func main() {
 
 	// Implement the graceful shutdown
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 	logger.Info("Shutting down server")
 }

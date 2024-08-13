@@ -54,6 +54,16 @@ make run
 make setup
 ```
 
+## Переменные окружения
+
+Проект использует следующие переменные окружения:
+
+- `SERVER_ADDRESS`: Адрес сервера (по умолчанию "localhost:8080")
+- `BASE_URL`: Базовый URL для сокращенных ссылок (по умолчанию "http://localhost:8080")
+- `RESTORE`: Флаг для восстановления данных при запуске (true/false)
+- `DATABASE_DSN`: Строка подключения к базе данных PostgreSQL
+- `SYNC_WRITE`: Флаг для синхронной записи в базу данных (true/false)
+
 ## Дополнительные ресурсы
 
 - [Go testing package](https://pkg.go.dev/testing)
