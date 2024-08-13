@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS short_urls (
+    id VARCHAR(10) PRIMARY KEY,
+    original_url VARCHAR(200) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);

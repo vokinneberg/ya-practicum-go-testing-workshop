@@ -1,0 +1,35 @@
+services:
+  shortener:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SERVER_ADDRESS=localhost:8080
+      - BASE_URL=http://localhost:8080
+      - RESTORE=false
+      - DATABASE_DSN=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - wait
+
+  postgres:
+    image: postgres:latest
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./data/seeds.sql:/docker-entrypoint-initdb.d/seeds.sql
+
+  wait:
+    image: dokku/wait
+
+volumes:
+  db_data:
