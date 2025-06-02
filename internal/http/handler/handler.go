@@ -1,13 +1,18 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
-
-	"github.com/vokinneberg/ya-praktukum-go-testing-workshop/internal/url"
 )
+
+//go:generate mockgen -source=handler.go -destination=mocks/service_mock.go -package=mocks
+type URLService interface {
+	ShortenURL(ctx context.Context, url string) (string, error)
+	GetOriginalURL(ctx context.Context, id string) (string, error)
+}
 
 type HTTPErrorResponse struct {
 	Error string `json:"error"`
@@ -18,11 +23,11 @@ type HTTPURLResponse struct {
 }
 
 type Handler struct {
-	service *url.Service
+	service URLService
 	logger  *slog.Logger
 }
 
-func New(service *url.Service, logger *slog.Logger) *Handler {
+func New(service URLService, logger *slog.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
 }
 
@@ -71,9 +76,7 @@ func (h *Handler) ShortURLHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Return the short URL
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(struct {
-		Result string `json:"result"`
-	}{Result: shortURL})
+	err = json.NewEncoder(w).Encode(HTTPURLResponse{URL: shortURL})
 	if err != nil {
 		h.WriteError(w, "Failed to encode response", http.StatusInternalServerError)
 		return

@@ -3,45 +3,90 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vokinneberg/ya-praktukum-go-testing-workshop/config"
+	"github.com/vokinneberg/ya-praktukum-go-testing-workshop/internal/http/handler/mocks"
 	"github.com/vokinneberg/ya-praktukum-go-testing-workshop/internal/url"
 )
 
 func TestShortURLHandler(t *testing.T) {
 	testCases := []struct {
-		name           string
-		body           string
-		contentType    string
-		expectedStatus int
-		expectedBody   string
+		name        string
+		body        string
+		setup       func(t *testing.T) (URLService, *config.Config)
+		contentType string
+		wantStatus  int
+		wantBody    HTTPURLResponse
+		wantError   HTTPErrorResponse
 	}{
 		{
-			name:           "unsupported_content_type_should_return_415",
-			body:           `{"url": "https://www.google.com"}`,
-			contentType:    "text/plain",
-			expectedStatus: http.StatusUnsupportedMediaType,
-			expectedBody:   `{"error":"Content-Type is not supported"}` + "\n",
+			name: "valid_request_should_return_200",
+			body: `{"url": "https://www.google.com"}`,
+			setup: func(t *testing.T) (URLService, *config.Config) {
+				cfg, err := config.New()
+				if err != nil {
+					t.Fatalf("Failed to create config: %v", err)
+				}
+				ctrl := gomock.NewController(t)
+				service := mocks.NewMockURLService(ctrl)
+				service.EXPECT().ShortenURL(gomock.All(), "https://www.google.com").Return("http://localhost:8080/abc123", nil)
+				return service, cfg
+			},
+			contentType: "application/json",
+			wantStatus:  http.StatusOK,
+			wantBody: HTTPURLResponse{
+				URL: "http://localhost:8080/abc123",
+			},
 		},
 		{
-			name:           "invalid_request_should_return_400",
-			body:           `bogus`,
-			contentType:    "application/json",
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `{"error":"Failed to parse request body"}` + "\n",
+			name: "unsupported_content_type_should_return_415",
+			body: `{"url": "https://www.google.com"}`,
+			setup: func(t *testing.T) (URLService, *config.Config) {
+				cfg, err := config.New()
+				if err != nil {
+					t.Fatalf("Failed to create config: %v", err)
+				}
+				ctrl := gomock.NewController(t)
+				service := mocks.NewMockURLService(ctrl)
+				service.EXPECT().ShortenURL(gomock.Any(), "https://www.google.com").Return(gomock.Any().String(), nil).Times(0)
+				return service, cfg
+			},
+			contentType: "text/plain",
+			wantStatus:  http.StatusUnsupportedMediaType,
+			wantError: HTTPErrorResponse{
+				Error: "Content-Type is not supported",
+			},
+		},
+		{
+			name: "invalid_request_should_return_400",
+			body: `bogus`,
+			setup: func(t *testing.T) (URLService, *config.Config) {
+				cfg, err := config.New()
+				if err != nil {
+					t.Fatalf("Failed to create config: %v", err)
+				}
+				ctrl := gomock.NewController(t)
+				service := mocks.NewMockURLService(ctrl)
+				service.EXPECT().ShortenURL(gomock.Any(), "bogus").Return(gomock.Any().String(), nil).Times(0)
+				return service, cfg
+			},
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+			wantError: HTTPErrorResponse{
+				Error: "Failed to parse request body",
+			},
 		},
 	}
 
-	cfg, err := config.New()
-	if err != nil {
-		t.Fatalf("Failed to create config: %v", err)
-	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -52,25 +97,25 @@ func TestShortURLHandler(t *testing.T) {
 			}
 
 			recorder := httptest.NewRecorder()
-			dbpool, err := pgxpool.New(context.Background(), cfg.DatabaseDSN)
-			if err != nil {
-				t.Fatalf("Failed to create database pool: %v", err)
-			}
-			defer dbpool.Close()
 
-			repository := url.NewRepository(dbpool, false)
-			service := url.NewService(repository, cfg)
+			service, _ := tc.setup(t)
 			handler := New(service, logger)
 			handler.ShortURLHandler(recorder, req)
 
 			// Check the status code.
-			if recorder.Code != tc.expectedStatus {
-				t.Errorf("Expected status %d, got %d", tc.expectedStatus, recorder.Code)
+			if recorder.Code != tc.wantStatus {
+				t.Errorf("Expected status %d, got %d", tc.wantStatus, recorder.Code)
 			}
 
 			// Check the response body.
-			if got := recorder.Body.String(); got != tc.expectedBody {
-				t.Errorf("Expected response body %q, got %q", tc.expectedBody, got)
+			var got HTTPURLResponse
+			err = json.NewDecoder(recorder.Body).Decode(&got)
+			if err != nil {
+				t.Errorf("Failed to decode response body: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.wantBody, got); diff != "" {
+				t.Errorf("Response body mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
