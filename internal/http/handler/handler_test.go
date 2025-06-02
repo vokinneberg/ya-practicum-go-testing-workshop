@@ -106,3 +106,48 @@ func BenchmarkShortURLHandler_ValidRequest(b *testing.B) {
 		handler.ShortURLHandler(recorder, req)
 	}
 }
+
+func FuzzShortURLHandler(f *testing.F) {
+	// Add seed corpus
+	f.Add(`{"url": "https://www.google.com"}`, "application/json")
+	f.Add(`{"url": "https://example.com"}`, "text/plain")
+	f.Add(`invalid json`, "application/json")
+	f.Add(`{"url": "https://test.com"}`, "application/xml")
+
+	cfg, err := config.New()
+	if err != nil {
+		f.Fatalf("Failed to create config: %v", err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	dbpool, err := pgxpool.New(context.Background(), cfg.DatabaseDSN)
+	if err != nil {
+		f.Fatalf("Failed to create database pool: %v", err)
+	}
+	defer dbpool.Close()
+
+	repository := url.NewRepository(dbpool, false)
+	service := url.NewService(repository, cfg)
+	handler := New(service, logger)
+
+	f.Fuzz(func(t *testing.T, body string, contentType string) {
+		req, err := http.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(body))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", contentType)
+
+		recorder := httptest.NewRecorder()
+		handler.ShortURLHandler(recorder, req)
+
+		// Basic validation - ensure we don't get a 500 error
+		if recorder.Code == http.StatusInternalServerError {
+			t.Errorf("Handler returned 500 for input: body=%q, contentType=%q", body, contentType)
+		}
+
+		// Ensure we get a valid response body
+		if recorder.Body.Len() == 0 {
+			t.Errorf("Empty response body for input: body=%q, contentType=%q", body, contentType)
+		}
+	})
+}
