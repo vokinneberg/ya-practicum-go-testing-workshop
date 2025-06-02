@@ -26,6 +26,13 @@ const (
 	`
 )
 
+// ShortURL is the model for the short URL
+type ShortURL struct {
+	ID          string
+	OriginalURL string
+	CreatedAt   time.Time
+}
+
 // Repository is the repository for the short URLs
 type Repository struct {
 	dbpool    *pgxpool.Pool

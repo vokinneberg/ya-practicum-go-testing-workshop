@@ -1,4 +1,4 @@
-.PHONY: build test test-coveralls deploy diff destroy gen lint config setup stop teardown
+.PHONY: build test test-coveralls deploy diff destroy gen lint config setup stop teardown bench
 
 # Export envars
 include .env
@@ -23,6 +23,9 @@ test:
 
 test-coveralls:
 	go test -v -cover -coverprofile=profile.cov ./...
+
+bench:
+	go test -bench=. -benchmem ./...
 
 # code generation for mock
 gen:

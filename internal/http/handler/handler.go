@@ -1,20 +1,33 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
-
-	"github.com/vokinneberg/ya-praktukum-go-testing-workshop/internal/url"
 )
 
+//go:generate mockgen -source=handler.go -destination=mocks/service_mock.go -package=mocks
+type URLService interface {
+	ShortenURL(ctx context.Context, url string) (string, error)
+	GetOriginalURL(ctx context.Context, id string) (string, error)
+}
+
+type HTTPErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type HTTPURLResponse struct {
+	URL string `json:"url"`
+}
+
 type Handler struct {
-	service *url.Service
+	service URLService
 	logger  *slog.Logger
 }
 
-func New(service *url.Service, logger *slog.Logger) *Handler {
+func New(service URLService, logger *slog.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
 }
 
@@ -27,14 +40,14 @@ func (h *Handler) ShortURLHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the request is JSON
 	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "Content-Type is not supported", http.StatusUnsupportedMediaType)
+		h.WriteError(w, "Content-Type is not supported", http.StatusUnsupportedMediaType)
 		return
 	}
 
 	// Read the request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		h.WriteError(w, "Failed to read request body", http.StatusInternalServerError)
 		return
 	}
 
@@ -44,30 +57,28 @@ func (h *Handler) ShortURLHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		h.WriteError(w, "Failed to parse request body", http.StatusBadRequest)
 		return
 	}
 
 	// Check if the URL is valid
 	if req.URL == "" {
-		http.Error(w, "URL is required", http.StatusBadRequest)
+		h.WriteError(w, "URL is required", http.StatusBadRequest)
 		return
 	}
 
 	// Shorten the URL
 	shortURL, err := h.service.ShortenURL(r.Context(), req.URL)
 	if err != nil {
-		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
+		h.WriteError(w, "Failed to shorten URL", http.StatusInternalServerError)
 		return
 	}
 
 	// Return the short URL
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(struct {
-		Result string `json:"result"`
-	}{Result: shortURL})
+	err = json.NewEncoder(w).Encode(HTTPURLResponse{URL: shortURL})
 	if err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		h.WriteError(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }
@@ -77,12 +88,12 @@ func (h *Handler) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	originalURL, err := h.service.GetOriginalURL(r.Context(), id)
 	if err != nil {
-		http.Error(w, "Failed to get original URL", http.StatusInternalServerError)
+		h.WriteError(w, "Failed to get original URL", http.StatusInternalServerError)
 		return
 	}
 
 	if originalURL == "" {
-		http.Error(w, "URL not found", http.StatusNotFound)
+		h.WriteError(w, "URL not found", http.StatusNotFound)
 		return
 	}
 
@@ -93,7 +104,15 @@ func (h *Handler) PingHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte("pong"))
 	if err != nil {
-		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		h.WriteError(w, "Failed to write response", http.StatusInternalServerError)
 		return
+	}
+}
+
+func (h *Handler) WriteError(w http.ResponseWriter, message string, status int) {
+	w.WriteHeader(status)
+	err := json.NewEncoder(w).Encode(HTTPErrorResponse{Error: message})
+	if err != nil {
+		h.logger.Error("Failed to encode response", "error", err)
 	}
 }

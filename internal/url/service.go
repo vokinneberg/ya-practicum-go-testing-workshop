@@ -10,12 +10,18 @@ import (
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+//go:generate mockgen -source=service.go -destination=repository_mock.go -package=url
+type URLRepository interface {
+	GetURL(ctx context.Context, url string) (*ShortURL, error)
+	CreateURL(ctx context.Context, url *ShortURL) (*ShortURL, error)
+}
+
 type Service struct {
-	repo *Repository
+	repo URLRepository
 	cfg  *config.Config
 }
 
-func NewService(repo *Repository, cfg *config.Config) *Service {
+func NewService(repo URLRepository, cfg *config.Config) *Service {
 	return &Service{repo: repo, cfg: cfg}
 }
 
