@@ -1,21 +1,4 @@
 services:
-  shortener:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: always
-    environment:
-      - SERVER_ADDRESS=localhost:8080
-      - BASE_URL=http://localhost:8080
-      - RESTORE=true
-      - DATABASE_DSN=postgres://postgres:postgres@ya-praktukum-go-testing-workshop-postgres-1:5432/postgres?sslmode=disable
-      - SYNC_WRITE=true
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-      - wait
-
   postgres:
     image: postgres:latest
     restart: always
